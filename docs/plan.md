@@ -983,3 +983,366 @@ These decisions should be clarified before development accelerates:
 * Are internal notes visible only within the institution, or also to AMLakas?
 * What file retention and deletion rules apply to sensitive documents?
 * Is response release always manual, or can it be automated after approval?
+
+---
+
+# Phase 1 Execution Checklist
+
+Phase 1 should establish access control and the first requester workflow slice. The goal is to create a stable domain foundation before AMLakas verification, institution routing, and approval flows are added.
+
+## Phase 1 Goal
+
+Deliver a secure requester-facing request submission module backed by role-aware organization data.
+
+Success outcome:
+
+* A requester can sign in, create a request, attach files, submit it, and view only their own requests
+* Internal users can be modeled with organization membership and role metadata
+* The application is ready for verification and routing in Phase 2
+
+---
+
+## Track 1 - Domain and Access Foundation
+
+### 1.1 Create organization tables
+
+Add:
+
+* `agencies`
+* `institutions`
+* `memberships`
+
+Suggested responsibilities:
+
+* `agencies` represent request-origin organizations
+* `institutions` represent target organizations receiving requests
+* `memberships` connect users to an organization and role
+
+Suggested membership fields:
+
+* `user_id`
+* `organization_type`
+* `organization_id`
+* `role`
+* `is_primary`
+* timestamps
+
+Implementation notes:
+
+* Use separate organization tables instead of storing everything on `users`
+* Keep role assignment data relational and queryable
+* Add indexes for `organization_type`, `organization_id`, and `role`
+
+### 1.2 Extend application models
+
+Create or update:
+
+* `App\Models\Agency`
+* `App\Models\Institution`
+* `App\Models\Membership`
+* `App\Models\User`
+
+Add relationships for:
+
+* user to memberships
+* membership to user
+* membership to agency or institution
+
+Optional helper methods on `User`:
+
+* `memberships()`
+* `agencyMemberships()`
+* `institutionMemberships()`
+* `hasRole(string $role): bool`
+
+### 1.3 Define role vocabulary
+
+Establish an explicit role set early:
+
+* `requester`
+* `amlakas_verifier`
+* `institution_manager`
+* `institution_staff`
+
+Implementation notes:
+
+* Prefer a PHP enum or a dedicated constants class
+* Use machine-readable role values consistently across backend and frontend
+
+### 1.4 Share role context with Inertia
+
+Extend shared props to expose the current user’s high-level access context.
+
+Add to shared data:
+
+* current memberships
+* primary role
+* current agency or institution summary
+
+Use case:
+
+* role-aware navigation
+* conditional dashboard content
+* route guards in frontend components
+
+### 1.5 Add authorization layer
+
+Create policies or equivalent access rules for:
+
+* viewing requests
+* creating requests
+* uploading request attachments
+
+Rules for Phase 1:
+
+* requesters can only view their own requests
+* internal roles should not gain broad access until verifier and institution flows are implemented
+
+---
+
+## Track 2 - Request Submission Foundation
+
+### 2.1 Create request tables
+
+Add:
+
+* `requests`
+* `request_attachments`
+
+Suggested `requests` fields:
+
+* `requester_id`
+* `agency_id`
+* `target_institution_id`
+* `reference_number`
+* `request_type`
+* `subject`
+* `description`
+* `status`
+* `submitted_at`
+* timestamps
+
+Suggested `request_attachments` fields:
+
+* `request_id`
+* `uploaded_by`
+* `original_name`
+* `path`
+* `mime_type`
+* `size`
+* timestamps
+
+Implementation notes:
+
+* Start with `draft` and `submitted` statuses only for Phase 1
+* Use private storage, not public asset-style storage
+* Add indexes on `requester_id`, `agency_id`, `target_institution_id`, and `status`
+
+### 2.2 Create request models
+
+Create:
+
+* `App\Models\Request`
+* `App\Models\RequestAttachment`
+
+Recommended relationships:
+
+* request belongs to requester user
+* request belongs to agency
+* request belongs to target institution
+* request has many attachments
+* attachment belongs to request
+* attachment belongs to uploader user
+
+### 2.3 Define request status language
+
+Use a stable machine-readable status model from the start.
+
+Phase 1 statuses:
+
+* `draft`
+* `submitted`
+
+Reserve later statuses for future phases without implementing them yet.
+
+### 2.4 Create validation requests
+
+Add Form Requests for:
+
+* storing a draft request
+* submitting a request
+* uploading attachments
+
+Validation should cover:
+
+* required requester fields
+* file MIME types
+* file size limits
+* target institution existence
+
+---
+
+## Track 3 - Requester Experience
+
+### 3.1 Add requester routes
+
+Create a dedicated route group for requester request flows.
+
+Initial route set:
+
+* list requests
+* show create form
+* store draft
+* show request detail
+* submit request
+
+Route behavior:
+
+* protect with `auth` and `verified`
+* name routes consistently for Wayfinder generation
+
+### 3.2 Add thin controllers
+
+Create a dedicated controller for requester request flows.
+
+Suggested actions:
+
+* `index`
+* `create`
+* `store`
+* `show`
+* `submit`
+
+Implementation notes:
+
+* Keep controller methods thin
+* Use Form Requests for validation
+* Use policy authorization in each action
+
+### 3.3 Add Inertia pages
+
+Create initial pages for:
+
+* requester request index
+* requester request create form
+* requester request detail
+
+UI expectations:
+
+* reuse existing app layout
+* reuse current form primitives and headings
+* use empty states when there are no requests
+* display status clearly
+
+### 3.4 Add role-aware navigation
+
+Update app navigation to expose requester workflow links when the current user has requester access.
+
+Initial nav entries:
+
+* `Dashboard`
+* `Requests`
+* `New Request`
+
+Implementation notes:
+
+* use shared Inertia auth context
+* keep links generated through Wayfinder or named route helpers
+
+### 3.5 Add file upload support
+
+Support multiple attachment uploads on request create and edit flows.
+
+Requirements:
+
+* private file storage
+* validated file types
+* secure download strategy for later phases
+* attachment metadata persisted in database
+
+Phase 1 note:
+
+* download endpoints can be deferred if files remain visible only in requester detail views for now
+
+---
+
+## Track 4 - Test Coverage
+
+Every Phase 1 change should be covered with focused Pest feature tests.
+
+### 4.1 Membership and access tests
+
+Add tests for:
+
+* requester role can access requester routes
+* non-requester roles are denied requester-only flows
+* users cannot view requests they do not own
+
+### 4.2 Request creation tests
+
+Add tests for:
+
+* create page renders
+* draft request can be stored
+* submitted request persists with `submitted` status
+* validation errors are enforced
+
+### 4.3 Attachment tests
+
+Add tests for:
+
+* valid files can be uploaded
+* invalid file types are rejected
+* oversized files are rejected
+
+### 4.4 Inertia response tests
+
+Add tests for:
+
+* request index renders correct component
+* request create page renders correct component
+* request detail page renders only allowed data
+
+---
+
+## Suggested File Targets
+
+Likely first files to add or update:
+
+* new migrations for organizations, memberships, requests, and request attachments
+* new models under `app/Models`
+* new Form Requests under `app/Http/Requests`
+* new controllers under `app/Http/Controllers`
+* `routes/web.php` or a dedicated route file for requests
+* `app/Http/Middleware/HandleInertiaRequests.php`
+* new request pages under `resources/js/pages`
+* navigation updates under `resources/js/components`
+* new feature tests under `tests/Feature`
+
+---
+
+## Recommended Implementation Order
+
+Build Phase 1 in this order:
+
+1. Organizations, memberships, and role vocabulary
+2. User relationships and shared Inertia role context
+3. Request and attachment schema
+4. Policies and authorization rules
+5. Requester routes and controller actions
+6. Requester Inertia pages and navigation
+7. File upload support
+8. Pest feature tests and cleanup
+
+---
+
+## Definition of Done for Phase 1
+
+Phase 1 is complete when all of the following are true:
+
+* requester organization membership exists and is queryable
+* a requester can create a request with attachments
+* a requester can submit and view the request
+* another requester cannot access that request
+* request pages are reachable through the app navigation
+* relevant Pest feature tests pass

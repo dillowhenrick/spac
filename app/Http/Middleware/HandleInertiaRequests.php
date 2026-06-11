@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\Membership;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -40,6 +41,20 @@ class HandleInertiaRequests extends Middleware
             'name' => config('app.name'),
             'auth' => [
                 'user' => $request->user(),
+                'memberships' => $request->user()
+                    ? $request->user()
+                        ->memberships()
+                        ->with('organization')
+                        ->get()
+                        ->map(fn (Membership $membership) => [
+                            'id' => $membership->id,
+                            'role' => $membership->role->value,
+                            'is_primary' => $membership->is_primary,
+                            'organization_type' => $membership->organization_type,
+                            'organization_id' => $membership->organization_id,
+                            'organization_name' => $membership->organization?->name,
+                        ])
+                    : [],
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
         ];

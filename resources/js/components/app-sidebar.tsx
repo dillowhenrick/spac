@@ -1,5 +1,7 @@
-import { Link } from '@inertiajs/react';
-import { BookOpen, FolderGit2, LayoutGrid } from 'lucide-react';
+import { Link, usePage } from '@inertiajs/react';
+import { BookOpen, ClipboardList, FilePlus, FileText, FolderGit2, LayoutGrid } from 'lucide-react';
+import { index as requestsIndex, create as requestsCreate } from '@/actions/App/Http/Controllers/Requester/RequestController';
+import { index as verificationIndex } from '@/actions/App/Http/Controllers/AmlakasVerifier/VerificationController';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
@@ -14,15 +16,7 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
-import type { NavItem } from '@/types';
-
-const mainNavItems: NavItem[] = [
-    {
-        title: 'Dashboard',
-        href: dashboard(),
-        icon: LayoutGrid,
-    },
-];
+import type { Auth, NavItem } from '@/types';
 
 const footerNavItems: NavItem[] = [
     {
@@ -38,6 +32,23 @@ const footerNavItems: NavItem[] = [
 ];
 
 export function AppSidebar() {
+    const { auth } = usePage<{ auth: Auth }>().props;
+    const isRequester = auth.memberships?.some((m) => m.role === 'requester') ?? false;
+    const isVerifier = auth.memberships?.some((m) => m.role === 'amlakas_verifier') ?? false;
+
+    const mainNavItems: NavItem[] = [
+        { title: 'Dashboard', href: dashboard(), icon: LayoutGrid },
+        ...(isRequester
+            ? [
+                  { title: 'Requests', href: requestsIndex.url(), icon: FileText },
+                  { title: 'New Request', href: requestsCreate.url(), icon: FilePlus },
+              ]
+            : []),
+        ...(isVerifier
+            ? [{ title: 'Verification Queue', href: verificationIndex.url(), icon: ClipboardList }]
+            : []),
+    ];
+
     return (
         <Sidebar collapsible="icon" variant="inset">
             <SidebarHeader>

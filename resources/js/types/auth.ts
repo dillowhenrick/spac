@@ -10,8 +10,18 @@ export type User = {
     [key: string]: unknown;
 };
 
+export type Membership = {
+    id: number;
+    role: string;
+    is_primary: boolean;
+    organization_type: 'agency' | 'institution';
+    organization_id: number;
+    organization_name: string;
+};
+
 export type Auth = {
     user: User;
+    memberships: Membership[];
 };
 
 /* @chisel-passkeys */

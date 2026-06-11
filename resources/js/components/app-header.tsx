@@ -1,5 +1,10 @@
 import { Link, usePage } from '@inertiajs/react';
-import { BookOpen, Folder, LayoutGrid, Menu, Search } from 'lucide-react';
+import { BookOpen, ClipboardCheck, ClipboardList, FilePlus, FileText, Folder, InboxIcon, LayoutGrid, Menu, Search, ShieldCheck, ShieldAlert } from 'lucide-react';
+import { index as requestsIndex, create as requestsCreate } from '@/actions/App/Http/Controllers/Requester/RequestController';
+import { index as verificationIndex } from '@/actions/App/Http/Controllers/AmlakasVerifier/VerificationController';
+import { index as systemAudit } from '@/actions/App/Http/Controllers/AmlakasVerifier/SystemAuditController';
+import { queue as institutionQueue } from '@/actions/App/Http/Controllers/Institution/ManagerController';
+import { index as assignedIndex } from '@/actions/App/Http/Controllers/Institution/StaffController';
 import AppLogo from '@/components/app-logo';
 import AppLogoIcon from '@/components/app-logo-icon';
 import { Breadcrumbs } from '@/components/breadcrumbs';
@@ -23,29 +28,21 @@ import {
     SheetTitle,
     SheetTrigger,
 } from '@/components/ui/sheet';
-import {
-    Tooltip,
-    TooltipContent,
-    TooltipTrigger,
-} from '@/components/ui/tooltip';
+// import {
+//     Tooltip,
+//     TooltipContent,
+//     TooltipTrigger,
+// } from '@/components/ui/tooltip';
 import { UserMenuContent } from '@/components/user-menu-content';
 import { useCurrentUrl } from '@/hooks/use-current-url';
 import { useInitials } from '@/hooks/use-initials';
 import { cn, toUrl } from '@/lib/utils';
 import { dashboard } from '@/routes';
-import type { BreadcrumbItem, NavItem } from '@/types';
+import type { Auth, BreadcrumbItem, NavItem } from '@/types';
 
 type Props = {
     breadcrumbs?: BreadcrumbItem[];
 };
-
-const mainNavItems: NavItem[] = [
-    {
-        title: 'Dashboard',
-        href: dashboard(),
-        icon: LayoutGrid,
-    },
-];
 
 const rightNavItems: NavItem[] = [
     {
@@ -64,10 +61,35 @@ const activeItemStyles =
     'text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100';
 
 export function AppHeader({ breadcrumbs = [] }: Props) {
-    const page = usePage();
+    const page = usePage<{ auth: Auth }>();
     const { auth } = page.props;
     const getInitials = useInitials();
     const { isCurrentUrl, whenCurrentUrl } = useCurrentUrl();
+
+    const roles = auth.memberships?.map((m) => m.role) ?? [];
+    const isRequester = roles.includes('requester');
+    const isVerifier = roles.includes('amlakas_verifier');
+    const isManager = roles.includes('institution_manager');
+    const isStaff = roles.includes('institution_staff');
+
+    const mainNavItems: NavItem[] = [
+        { title: 'Dashboard', href: dashboard(), icon: LayoutGrid },
+        ...(isRequester ? [
+            { title: 'Requests', href: requestsIndex.url(), icon: FileText },
+            { title: 'New Request', href: requestsCreate.url(), icon: FilePlus },
+        ] : []),
+        ...(isVerifier ? [
+            { title: 'Verification Queue', href: verificationIndex.url(), icon: ClipboardList },
+            { title: 'System Audit', href: systemAudit.url(), icon: ShieldAlert },
+        ] : []),
+        ...(isManager ? [
+            { title: 'Institution Queue', href: institutionQueue.url(), icon: InboxIcon },
+        ] : []),
+        ...(isStaff ? [
+            { title: 'My Assignments', href: assignedIndex.url(), icon: ClipboardCheck },
+        ] : []),
+        { title: 'Security Log', href: '/my/security', icon: ShieldCheck },
+    ];
 
     return (
         <>
@@ -185,7 +207,7 @@ export function AppHeader({ breadcrumbs = [] }: Props) {
                             >
                                 <Search className="!size-5 opacity-80 group-hover:opacity-100" />
                             </Button>
-                            <div className="ml-1 hidden gap-1 lg:flex">
+                            {/* <div className="ml-1 hidden gap-1 lg:flex">
                                 {rightNavItems.map((item) => (
                                     <Tooltip key={item.title}>
                                         <TooltipTrigger>
@@ -208,7 +230,7 @@ export function AppHeader({ breadcrumbs = [] }: Props) {
                                         </TooltipContent>
                                     </Tooltip>
                                 ))}
-                            </div>
+                            </div> */}
                         </div>
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
